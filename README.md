@@ -1,4 +1,4 @@
-This project provides a Python wrappers for the Finger Lakes Instrumentation
+This project provides Python wrappers for the Finger Lakes Instrumentation
 SDK libfli-1.104 on Linux. It exposes all the public functions and macros
 with the following exceptions:
 
