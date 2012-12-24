@@ -26,7 +26,7 @@ provide a way to determine the operative precision, so it is up to the user
 to be careful and track the precision in use.
 
 Both Python and Numpy are needed for installation. The supported versions
-are Python 2.6-2.7 and Numpy &ge 1.5. These versions are probably
+are Python 2.6-2.7 and Numpy >= 1.5. These versions are probably
 conservative and it is likely that earlier versions will work. Python 3 is
 not currently supported, but as far as I know the only things that may
 create difficulties are strings. One case that will definitely cause
@@ -37,4 +37,4 @@ Linux USB driver 1.3 from http://www.flicamera.com/software/index.html are
 provided.
 
 Another option for those interested in Python FLI support is Craig Versek's
-ctypes based wrappers at cversek/python-FLI.
+ctypes based wrappers https://github.com/cversek/python-FLI.
