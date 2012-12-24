@@ -1,0 +1,85 @@
+This covers the installation of the Finger Lakes Instrumentation SDK
+wrappers on Linux. Anyone who is able to modify things to work on Darwin or
+Windows is welcome to make a contribution.
+
+Linux Installation
+==================
+
+As currently configured a number of step must be taken in order for pyfli
+to be installed and work properly.
+
+dependencies
+------------
+
+gcc compiler
+kernel headers -- for compiling the FLI usb driver
+python headers -- for compiling the python extension
+
+The details of how to install the dependencies will vary from distro to
+distro, but they should all be available through the package manager.
+
+fliusb driver installation
+--------------------------
+
+Note that this needs to be done each time a new kernel is installed, which
+can be often in a distribution like Fedora. From inside the pyfli git
+repository the steps are
+
+cd fliusb-1.3
+make clean
+make
+sudo cp fliusb.ko /lib/modules/$(uname -r)/extra
+sudo depmod
+
+Once this is done the driver will be automatically loaded when a FLI usb
+device is plugged in. The module directory location used above works for my
+distribution, Fedora 17, it may need to be modified for other
+distributions.
+
+udev configuration
+------------------
+
+The default permissions of the /dev/fliusb[0-9]* created when a FLI device
+is plugged in only allow root access. This may be changed and the device
+name customized by adding a rules script to /etc/udev/rules.d. An example
+script 10-local.rules.example can serve as a template for this, strip
+the 'example' extension, modify as needed, and do the copy. The results
+can be checked by plugging in a FLI device and looking at the permissions
+of the created /dev node.
+
+libfli compilation
+------------------
+
+From the top level of the pyfli repository do the following.
+
+cd libfli-1.104
+make clean
+make
+
+The result should be the creation of 'libfli.a' in that directory. Note
+that the Makefile is a modified version of that supplied by FLI, in
+particular the -fPIC flag is needed for linking into a Python extension
+module.
+
+pyfli module installation
+-------------------------
+
+This is straight forward. From the top level do
+
+python setup.py build
+sudo python setup.py install
+
+or as I prefer
+
+python setup.py install --user
+
+
+Windows Installation
+====================
+
+I don't have windows available to figure out how to make it work. One
+complication is likely to be that the same compiler needs to be used to
+compile the extension as was used to compile python. Another is the libfli
+creation. Binaries of the library are available from the FLI website, but
+compatibility problems may be present. If anyone wants to pursue this I'd
+be happy to add anything they can provide.
