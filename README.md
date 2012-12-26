@@ -9,10 +9,17 @@ macros with the following exceptions:
     FLISetDAC
     FLIDebug
 
+The wrapper for FLIUsbBulkIO is currently set to raise an error as I don't
+yet understand the implications of the function and it looks potentially
+dangerous.
+
 The wrapper signatures are not precisely the same as the Finger Lakes
 functions. For instance, functions that fill user supplied buffers return
 numpy arrays instead, C strings are returned as Python strings, and some
-arguments are passed as strings instead of C macro values.
+arguments are passed as strings instead of C macro values. In addition, the
+wrapper functions names generally drop the 'FLI' prefix and lowercase the
+first letter. The function correspondence is tabulate in the module
+documentation.
 
 All the wrappers have document strings that follow the Numpy documentation
 standard. Some of the functions in the SDK were undocumented and
@@ -23,14 +30,13 @@ in a way that seemed appropriate to its name.
 Some of the functions require knowledge of the ADC precision and may
 segfault if it is incorrectly specified. Finger Lakes doesn't currently
 provide a way to determine the operative precision, so it is up to the user
-to be careful and track the precision in use.
+to be careful and track the precision in use. The default value of the
+relevant argument has been set to 16 bits, which is safe but will not
+provide the expected results for 8 bit devices.
 
 Both Python and Numpy are needed for installation. The supported versions
-are Python 2.6-2.7 and Numpy >= 1.5. These versions are probably
-conservative and it is likely that earlier versions will work. Python 3 is
-not currently supported, but as far as I know the only things that may
-create difficulties are strings. One case that will definitely cause
-trouble is noted in the pyfli.pyd source.
+are Python 2.6-2.7, 3.x and Numpy >= 1.5. These versions are probably
+conservative and it is likely that earlier versions will work.
 
 Tested on Linux 3.6.10-2.fc17.x86\_64 Fedora 17. FLI SDK 1.104 and FLI
 Linux USB driver 1.3 from http://www.flicamera.com/software/index.html are
