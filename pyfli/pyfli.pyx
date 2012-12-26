@@ -169,7 +169,7 @@ __all__ = [
         'triggerExposure', 'unlockDevice', 'writeIOPort', 'writeUserEEPROM'
         ]
 
-# python 3 compatibility
+# python 3 compatibility functions
 
 if sys.version_info[0] >= 3:
 
@@ -187,6 +187,9 @@ else:
     asbytes = str
     asstr = str
 
+# precision lookup
+
+ADCType = {'8bit' : np.dtype(np.uint8), '16bit': np.dtype(np.uint16)}
 
 # maximum number of devices searched for
 cdef int MAXDEVICES = 100
@@ -403,7 +406,7 @@ def setVerticalTableEntry(dev, index, height, bin_, mode):
     chkerr(fli.FLISetVerticalTableEntry(dev, index, height, bin_, mode))
 
 
-def grabFrame(dev, depth='16bit'):
+def grabFrame(dev, depth='16bit', out=None):
     """
 
     Grab frame.
@@ -417,15 +420,21 @@ def grabFrame(dev, depth='16bit'):
     ----------
     dev : int
         Device handle.
-    depth : {'16bit', '8bit'}
+    depth : {'16bit', '8bit'}, optional
         Bitdepth. If this is set incorrectly a seqfault may result. The
         '16bit' value is safe and is the default, but if actual data is
         '8bit' the result will not look right.
+    out : ndarray, optional
+        The frame will be read into the `out` array if it is specified. It
+        must have the correct dimensions to contain the frame, but it can
+        have a different type than specified by `depth`.
 
     Returns
     -------
     frame : ndarray
-        A 2-D ndarray of uint8 or uint16 depending on `depth`.
+        A 2-D ndarray. If `out` is given it will be a reference to `out`,
+        otherwise it is a new array of type np.uint8 or np.uint16 depending
+        on the value of `depth`.
 
     See Also
     --------
@@ -435,18 +444,31 @@ def grabFrame(dev, depth='16bit'):
 
     """
     width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
+    shape = (height, width)
+    convert = False
 
-    if depth == '8bit':
-        out = np.empty([height, width], dtype=np.uint8)
-    elif depth == '16bit':
-        out = np.empty([height, width], dtype=np.uint16)
+    dt = ADCType[depth]
+    if out is not None:
+        if out.shape != shape:
+            msg = "The out argument has wrong dimensions."
+            raise ValueError(msg)
+        if out.dtype != dt:
+            convert = True
+            buf = np.empty(shape, dt)
+        else:
+            convert = False
+            buf = out
     else:
-        msg = "Invalid depth %s." % depth
-        raise ValueError(msg)
+        buf = np.empty(shape, dt)
 
-    for row in out:
+    for row in buf:
         chkerr(fli.FLIGrabRow(dev, np.PyArray_DATA(row), width))
-    return out
+
+    if convert:
+        out[...] = buf
+        return out
+    else:
+        return buf
 
 
 def readUserEEPROM(dev, loc, address, nbytes):
@@ -574,6 +596,16 @@ def startVideoMode(dev):
     dev : int
         Device handle.
 
+    See Also
+    --------
+    stopVideoMode
+    grabVideoFrame
+
+    Notes
+    -----
+    Changing the image area while in video mode will cause a segfault on
+    readout. This looks like an FLI bug.
+
     """
     chkerr(fli.FLIStartVideoMode(dev))
 
@@ -590,46 +622,74 @@ def stopVideoMode(dev):
     dev : int
         Device handle.
 
+    See Also
+    --------
+    stopVideoMode
+    grabVideoFrame
+
     """
     chkerr(fli.FLIStopVideoMode(dev))
 
 
-def grabVideoFrame(dev):
+def grabVideoFrame(dev, out=None):
     """
 
     Grab video frame.
 
     Undocumented. This feature is only available on ProLine and MicroLine
-    cameras and the bitdepth is currently fixed at 16 bits.
+    cameras and the bitdepth is always 16 bits.
 
     Parameters
     ----------
     dev : int
         Device handle.
+    out : ndarray, optional
+        The frame will be read into the `out` array if it is specified. It
+        must have the correct dimensions to contain the frame, but it can
+        have a different type than specified by `depth`.
 
     Returns
     -------
     frame : ndarray
-        A 2-D ndarray of uint8 or uint16 depending on `depth`.
+        A 2-D ndarray. If `out` is given it will be a reference to `out`,
+        otherwise it is a new array of type np.uint16.
 
     See Also
     --------
+    startVideoMode
+    stopVideoMode
     getReadoutDimensions
     setImageArea
     setExposureTime
 
     """
-    # Don't allow this until we know what it does. Trying this on my
-    # system raises 'OSError: [Errno 12] Cannot allocate memory'.
-    #msg = "Undocumented, not implemented"
-    #raise RuntimeError(msg)
-
     width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
-    out = np.empty([height, width], dtype=np.uint16)
-    nbytes = out.size * 2
+    shape = (height, width)
+    convert = False
 
-    chkerr(fli.FLIGrabVideoFrame(dev, np.PyArray_DATA(out), nbytes))
-    return out
+    dt = ADCType['16bit']
+    if out is not None:
+        if out.shape != shape:
+            msg = "The out argument has wrong dimensions."
+            raise ValueError(msg)
+        if out.dtype != dt:
+            convert = True
+            buf = np.empty(shape, dt)
+        else:
+            convert = False
+            buf = out
+    else:
+        buf = np.empty(shape, dt)
+
+
+    nbytes = buf.size * buf.itemsize
+    chkerr(fli.FLIGrabVideoFrame(dev, np.PyArray_DATA(buf), nbytes))
+
+    if convert:
+        out[...] = buf
+        return out
+    else:
+        return buf
 
 
 #fixme
@@ -1483,7 +1543,7 @@ def getCoolerPower(dev):
     return power
 
 
-def grabRow(dev, depth='16bit'):
+def grabRow(dev, depth='16bit', out=None):
     """
 
     Grab a row of an image.
@@ -1499,15 +1559,21 @@ def grabRow(dev, depth='16bit'):
     dev : int
         Device handle.
 
-    depth : {'16bit', '8bit'}
+    depth : {'16bit', '8bit'}, optional
         Bitdepth. If this is set incorrectly a seqfault may result. The
         '16bit' value is safe and is the default, but if actual data is
         '8bit' the result will not look right.
+    out : ndarray, optional
+        The frame will be read into the `out` array if it is specified. It
+        must have the correct dimensions to contain the frame, but it can
+        have a different type than specified by `depth`.
 
     Returns
     -------
     row : ndarray
-        A 1-D ndarray of uint8 or uint16 depending on `depth`.
+        A 1-D ndarray. If `out` is given it will be a reference to `out`,
+        otherwise it is a new array of type np.uint8 or np.uint16 depending
+        on the value of `depth`.
 
     See Also
     --------
@@ -1517,17 +1583,30 @@ def grabRow(dev, depth='16bit'):
 
     """
     width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
+    shape = (width,)
+    convert = False
 
-    if depth == '8bit':
-        out = np.empty((1, width), dtype=np.uint8)
-    elif depth == '16bit':
-        out = np.empty((1, width), dtype=np.uint16)
+    dt = ADCType[depth]
+    if out is not None:
+        if out.shape != shape:
+            msg = "The out argument has wrong dimensions."
+            raise ValueError(msg)
+        if out.dtype != dt:
+            convert = True
+            buf = np.empty(shape, dt)
+        else:
+            convert = False
+            buf = out
     else:
-        msg = "Invalid depth %s." % depth
-        raise ValueError(msg)
+        buf = np.empty(shape, dt)
 
-    chkerr(fli.FLIGrabRow(dev, np.PyArray_DATA(out), width))
-    return out
+    chkerr(fli.FLIGrabRow(dev, np.PyArray_DATA(buf), width))
+
+    if convert:
+        out[...] = buf
+        return out
+    else:
+        return buf
 
 
 def exposeFrame(dev):
@@ -1610,7 +1689,6 @@ def setBitDepth(dev, depth):
     -------
     grabRow
     grabFrame
-    grabVideoFrame
 
     """
     cdef fli.flibitdepth_t bitdepth
