@@ -106,13 +106,14 @@ functions is a bit lower level and was chosen for that reason.
 
 """
 import os
-import numpy as np
+import sys
 import warnings
+import numpy as np
 
 cimport cython
-cimport libc.stdlib
 cimport libfli as fli
 cimport numpy as np
+from libc.stdlib cimport malloc, free
 
 np.import_array()
 
@@ -167,6 +168,24 @@ __all__ = [
         'startVideoMode', 'stepMotor', 'stepMotorAsync', 'stopVideoMode',
         'triggerExposure', 'unlockDevice', 'writeIOPort', 'writeUserEEPROM'
         ]
+
+# python 3 compatibility
+
+if sys.version_info[0] >= 3:
+
+    def asbytes(s):
+        if isinstance(s, bytes):
+            return s
+        return str(s).encode('latin1')
+
+    def asstr(s):
+        if isinstance(s, bytes):
+            return s.decode('latin1')
+        return str(s)
+
+else:
+    asbytes = str
+    asstr = str
 
 
 # maximum number of devices searched for
@@ -356,7 +375,9 @@ def getVerticalTableEntry(fli.flidev_t dev, index):
     mode : int
 
     """
-    cdef long height, bin_, mode
+    cdef long height
+    cdef long bin_
+    cdef long mode
 
     chkerr(fli.FLIGetVerticalTableEntry(dev, index, &height, &bin_, &mode))
     return height, bin_, mode
@@ -382,21 +403,35 @@ def setVerticalTableEntry(dev, index, height, bin_, mode):
     chkerr(fli.FLISetVerticalTableEntry(dev, index, height, bin_, mode))
 
 
-def grabFrame(dev, depth):
+def grabFrame(dev, depth='16bit'):
     """
 
     Grab frame.
 
     This function is an undocumented stub in libfli-1.104 and will return
     the error code for Invalid argument. So we make an appropriate function
-    using other fli library functions.
+    using other fli library functions. The size of the returned array is
+    obtained from a call to `getReadoutDimensions`.
 
     Parameters
     ----------
     dev : int
         Device handle.
-    depth : {'8bit', '16bit'}
-        Bitdepth.
+    depth : {'16bit', '8bit'}
+        Bitdepth. If this is set incorrectly a seqfault may result. The
+        '16bit' value is safe and is the default, but if actual data is
+        '8bit' the result will not look right.
+
+    Returns
+    -------
+    frame : ndarray
+        A 2-D ndarray of uint8 or uint16 depending on `depth`.
+
+    See Also
+    --------
+    getReadoutDimensions
+    setImageArea
+    grabRow
 
     """
     width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
@@ -414,7 +449,7 @@ def grabFrame(dev, depth):
     return out
 
 
-def readUserEEPROM(dev, long loc, long address):
+def readUserEEPROM(dev, loc, address, nbytes):
     """
 
     Read user EEPROM.
@@ -425,19 +460,32 @@ def readUserEEPROM(dev, long loc, long address):
     ----------
     dev : int
         Device handle.
-    loc : int
+    loc : {'user', 'pixel-map'}
         Location.
     address : int
-        Address
+        EEPROM byte address of first byte.
+    nbytes : int
+        Number of bytes to read.
 
     Returns
     -------
-    data : str
+    data : ndarray of uint8
 
     """
-    cdef char buf[256]
+    cdef long loc_
 
-    chkerr(fli.FLIReadUserEEPROM(dev, loc, address, 256, buf))
+    if loc == 'user':
+        loc_ = fli.FLI_EEPROM_USER
+    elif loc == 'pixel-map':
+        loc_ = fli.FLI_EEPROM_PIXEL_MAP
+    else:
+        msg = "Invalid loc %s." % loc
+        raise ValueError(msg)
+
+    buf = np.empty(nbytes, np.uint8)
+
+    chkerr(fli.FLIReadUserEEPROM(dev, loc_, address, nbytes,
+            np.PyArray_DATA(buf)))
     return buf
 
 
@@ -452,18 +500,44 @@ def writeUserEEPROM(dev, loc, address, data):
     ----------
     dev : int
         Device handle.
-    loc : int
+    loc : {'user', 'pixel-map'}
         Location.
     address : int
-        Address.
-    data : bytes str
-        Data to write.
+        EEPROM byte address of first byte.
+    data : ndarray
+        Data to be written. The data is converted to an array of
+        contiguous bytes and then written in C order. So, for instance,
+        an integer will normally fill four bytes.
+
+    Examples
+    --------
+
+    >>> import pyfli as fli
+    >>> import numpy as np
+    >>> cam = fli.FLIOpen('/dev/flicamera', 'usb', 'camera')
+    >>> msg = np.fromstring('Hello World', uint8)
+    >>> fli.writeUserEEPROM(cam, 'user', 0, msg)
+    >>> fli.readUserEEPROM(cam, 'user', 0, msg.size).tostring()
+    'Hello World'
+    >>> cam = fli.FLIClose(cam)
+
+
+
 
     """
-    cdef char *buf = data
-    cdef long length = len(data)
+    cdef long loc_
 
-    chkerr(fli.FLIWriteUserEEPROM(dev, loc, address, length, buf))
+    if loc == 'user':
+        loc_ = fli.FLI_EEPROM_USER
+    elif loc == 'pixel-map':
+        loc_ = fli.FLI_EEPROM_PIXEL_MAP
+    else:
+        msg = "Invalid loc %s." % loc
+        raise ValueError(msg)
+
+    data = np.ascontiguousarray(data).view(np.int8)
+    chkerr(fli.FLIWriteUserEEPROM(dev, loc_, address, data.size,
+            np.PyArray_DATA(data)))
 
 
 def setTDI(dev, rate, flags):
@@ -483,6 +557,8 @@ def setTDI(dev, rate, flags):
         Flags
 
     """
+    msg = "Undocumented, be careful, action unknown"
+    warnings.warn(msg, RuntimeWarning)
     chkerr(fli.FLISetTDI(dev, rate, flags))
 
 
@@ -518,13 +594,13 @@ def stopVideoMode(dev):
     chkerr(fli.FLIStopVideoMode(dev))
 
 
-#fixme
 def grabVideoFrame(dev):
     """
 
     Grab video frame.
 
-    Undocumented.
+    Undocumented. This feature is only available on ProLine and MicroLine
+    cameras and the bitdepth is currently fixed at 16 bits.
 
     Parameters
     ----------
@@ -534,12 +610,26 @@ def grabVideoFrame(dev):
     Returns
     -------
     frame : ndarray
-        Video frame.
+        A 2-D ndarray of uint8 or uint16 depending on `depth`.
+
+    See Also
+    --------
+    getReadoutDimensions
+    setImageArea
+    setExposureTime
 
     """
-    cdef char buff[256]
+    # Don't allow this until we know what it does. Trying this on my
+    # system raises 'OSError: [Errno 12] Cannot allocate memory'.
+    #msg = "Undocumented, not implemented"
+    #raise RuntimeError(msg)
 
-    chkerr(fli.FLIGrabVideoFrame(dev, buff, 256))
+    width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
+    out = np.empty([height, width], dtype=np.uint16)
+    nbytes = out.size * 2
+
+    chkerr(fli.FLIGrabVideoFrame(dev, np.PyArray_DATA(out), nbytes))
+    return out
 
 
 #fixme
@@ -548,28 +638,41 @@ def UsbBulkIO(dev, int ep, long length):
 
     USB bulk IO.
 
-    Undocumented.
+    Undocumented. This currently is set to raise RuntimeError until its
+    proper use can be determined. It looks like `ep` is one of *_BULKWRITE,
+    *_BULKREAD, where the prefix depends on windows or unix. Those macros
+    aren't included in the toplevel include file, so it isn't clear if this
+    is system dependent. This function currently raises RuntimeError until
+    it can be properly understood.
 
     Parameters
     ----------
     dev : int
         Device handle.
     ep : int
-
+        ? undocumented
     length : int
+        ? bytes
 
     Returns
     -------
+    data : ndarray of uint8
+        The length of the array is the amount of data actually read, it
+        may not be the same as the amount of data requested.
 
     """
-    cdef char buf[256]
-    cdef long len__ = length
+    msg = "Undocumented, too dangerous to allow at this point"
+    raise RuntimeError(msg)
 
-    chkerr(fli.FLIUsbBulkIO(dev, ep, buf, &len__))
+    buf = np.empty(length, dtype=np.uint8)
+    cdef long len_ = length
+
+    chkerr(fli.FLIUsbBulkIO(dev, ep, np.PyArray_Data(buf), &len_))
+    return buf[:len_]
 
 
 #
-# Functions relevant to the libfli
+# Functions relevant to libfli
 #
 
 
@@ -587,7 +690,7 @@ def getLibVersion():
     cdef char buf[256]
 
     chkerr(fli.FLIGetLibVersion(buf, 256))
-    return buf
+    return str(buf)
 
 
 def setDebugLevel(logfile, verbosity):
@@ -618,7 +721,8 @@ def setDebugLevel(logfile, verbosity):
         verbosity
 
     """
-    cdef char * path = logfile
+    bpath = asbytes(logfile)
+    cdef char * path = bpath
     cdef fli.flidebug_t level = 0
 
     if verbosity == 'none':
@@ -695,7 +799,7 @@ def FLIList(interface, device):
             break
         # The split won't work in python 3 unless ';' is
         # a byte string, i.e., b';'
-        results.append(cstr.split(';'))
+        results.append(asstr(cstr).split(';'))
 
     chkerr(fli.FLIFreeList(res))
     return results
@@ -737,8 +841,9 @@ def FLIOpen(path, interface, device):
     FLIList
 
     """
+    bpath = asbytes(path)
     cdef fli.flidomain_t domain = 0
-    cdef char *path_ = path
+    cdef char *path_ = bpath
     cdef fli.flidev_t dev
 
     if interface == 'usb':
@@ -814,7 +919,7 @@ def getModel(dev):
     cdef char buf[256]
 
     chkerr(fli.FLIGetModel(dev, buf, 256))
-    return buf
+    return asstr(buf)
 
 
 def getSerialString(dev):
@@ -841,7 +946,7 @@ def getSerialString(dev):
     cdef char buf[256]
 
     chkerr(fli.FLIGetSerialString(dev, buf, 256))
-    return buf
+    return asstr(buf)
 
 
 def getHWRevision(dev):
@@ -969,7 +1074,7 @@ def getCameraModeString(dev, index):
     cdef char mode[256]
 
     chkerr(fli.FLIGetCameraModeString(dev, index, mode, 256))
-    return mode
+    return asstr(mode)
 
 
 def getCameraMode(dev):
@@ -1378,7 +1483,7 @@ def getCoolerPower(dev):
     return power
 
 
-def grabRow(dev, depth):
+def grabRow(dev, depth='16bit'):
     """
 
     Grab a row of an image.
@@ -1386,29 +1491,29 @@ def grabRow(dev, depth):
     This function grabs the next available row of the image from the
     camera. A row is read from the camera and returned as an ndarray. Note
     that if `depth` is incorrect the buffer into which the data is read
-    may be too small and a segfault will result.
+    may be too small and a segfault will result. The width of the row read
+    out is obtained from a call to `getReadoutDimensions`.
 
     Parameters
     ----------
     dev : int
         Device handle.
-    depth : {'8bit', '16bit'}
-        Bitdepth.
+
+    depth : {'16bit', '8bit'}
+        Bitdepth. If this is set incorrectly a seqfault may result. The
+        '16bit' value is safe and is the default, but if actual data is
+        '8bit' the result will not look right.
 
     Returns
     -------
-    buff : ndarray
-        The same ndarray that was passed in.
+    row : ndarray
+        A 1-D ndarray of uint8 or uint16 depending on `depth`.
 
     See Also
     --------
+    getReadoutDimensions
+    setImageArea
     grabFrame
-
-    Notes
-    -----
-    The FLIGrabRow function segfaults if the width is insufficient to hold
-    the row, so we have removed that parameter and obtain it from
-    getReadoutDimenisions.
 
     """
     width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
@@ -1500,6 +1605,12 @@ def setBitDepth(dev, depth):
         Device handle.
     depth : {'8bit', '16bit'}
         Bitdepth.
+
+    SeeAlso
+    -------
+    grabRow
+    grabFrame
+    grabVideoFrame
 
     """
     cdef fli.flibitdepth_t bitdepth
@@ -2108,7 +2219,7 @@ def getFilterName(dev, position):
     cdef char buf[256]
 
     chkerr(fli.FLIGetFilterName(dev, position, buf, 256))
-    return buf
+    return asstr(buf)
 
 
 def setActiveWheel(dev, wheel):
