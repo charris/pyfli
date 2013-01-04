@@ -119,9 +119,9 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules"
         ],
     long_description = """\
-This is a Python wrapper for the Finger Lakes Instrumentation SDK
-libfli-1.104. It exposes all the public functions and macros with the
-following exceptions:
+This package supplies Python wrappers for the functions in the Finger Lakes
+Instrumentation SDK libfli-1.104 on Linux and Windows. It exposes all the
+public functions and macros with the following exceptions:
 
     FLICreateList
     FLIDeleteList
@@ -138,7 +138,7 @@ The wrapper signatures are not precisely the same as the Finger Lakes
 functions. For instance, functions that fill user supplied buffers return
 numpy arrays instead, C strings are returned as Python strings, and some
 arguments are passed as strings instead of C macro values. In addition, the
-wrapper functions names generally drop the 'FLI' prefix and lowercase the
+wrapper function names generally drop the 'FLI' prefix and lowercase the
 first letter. The function correspondence is tabulate in the module
 documentation.
 
@@ -155,8 +155,8 @@ to be careful and track the precision in use. The default value of the
 relevant argument has been set to 16 bits, which is safe but will not
 provide the expected results for 8 bit devices.
 
-The requred numpy version is probably conservative and earlier versions
-will probably work, but that hasn't been tested.
+The required numpy version is conservative and earlier versions
+will probably work, but they haven't been tested.
 
 """
 )

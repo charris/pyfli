@@ -14,6 +14,7 @@ dependencies
 gcc compiler
 kernel headers -- for compiling the FLI usb driver
 python headers -- for compiling the python extension
+numpy -- numpy package
 
 The details of how to install the dependencies will vary from distro to
 distro, but they should all be available through the package manager.
@@ -50,24 +51,10 @@ necessary to reload the rules.
 
 sudo udevadm control --reload-rules
 
-libfli compilation
-------------------
-
-From the top level of the pyfli repository do the following.
-
-cd libfli-1.104
-make clean
-make
-
-The result should be the creation of 'libfli.a' in that directory. Note
-that the Makefile is a modified version of that supplied by FLI, in
-particular the -fPIC flag is needed for linking into a Python extension
-module.
-
 pyfli module installation
 -------------------------
 
-This is straight forward. From the top level do
+Do
 
 python setup.py build
 sudo python setup.py install
@@ -80,9 +67,47 @@ python setup.py install --user
 Windows Installation
 ====================
 
-I don't have windows available to figure out how to make it work. One
-complication is likely to be that the same compiler needs to be used to
-compile the extension as was used to compile python. Another is the libfli
-creation. Binaries of the library are available from the FLI website, but
-compatibility problems may be present. If anyone wants to pursue this I'd
-be happy to add anything they can provide.
+dependencies
+------------
+
+The exact dependencies will vary a lot depending on the windows setup. It
+is probably easiest to use some standard package such as python(x,y) or the
+enthought distribution. I tested installation on Windows 7 using
+python(x,y). Python(x,y) comes with the mingw32 compiler along with numpy
+and a lot of other useful python packages. In any case, you will need all
+of the following in addition to the FLI usb drivers:
+
+compiler
+python
+numpy
+
+fliusb driver installation
+--------------------------
+
+The FLI drivers can be obtained by installing the FLI Software Installation
+Kit from  http://www.fli-cam.com/software/index.html. If you have a 64 bit
+OS, get the 64 bit version, and for a 32 bit OS the 32 bit version. That is
+independent of whether the installed python is 64 or 32 bit.
+
+pyfli module installation
+-------------------------
+
+Same as for Linux, from a console do
+
+python setup.py build
+sudo python setup.py install
+
+or as I prefer
+
+python setup.py install --user
+
+
+Macintosh installation
+======================
+
+The module compiles on Macintosh. You will need the xcode compilers, numpy,
+and python. The details will depend on the version of OSX, some of which
+are more troublesome than others. That is all moot, however, as no drivers
+are freely available. TheSkyX plugin from FLI probably has them, but it won't
+install anything without TheSkyX present. There is also some indication
+that libfli-1.104 is not up to date with regards to Darwin.
