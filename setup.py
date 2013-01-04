@@ -5,21 +5,88 @@
 """
 import numpy as np
 import os
+import platform
 from distutils.core import setup
 from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
 
+system = platform.system()
+
+flicom = "libfli-1.104"
+fliwin = os.path.join(flicom, "windows")
+fliunx = os.path.join(flicom, "unix")
+flilin = os.path.join(fliunx, "linux")
+flibsd = os.path.join(fliunx, "bsd")
+fliosx = os.path.join(fliunx, "osx")
+
+comsrc = [
+    os.path.join(flicom, "libfli.c"),
+    os.path.join(flicom, "libfli-camera.c"),
+    os.path.join(flicom, "libfli-camera-parport.c"),
+    os.path.join(flicom, "libfli-camera-usb.c"),
+    os.path.join(flicom, "libfli-filter-focuser.c"),
+    os.path.join(flicom, "libfli-mem.c")
+    ]
+unxsrc = [
+    os.path.join(fliunx, "libfli-serial.c"),
+    os.path.join(fliunx, "libfli-debug.c"),
+    os.path.join(fliunx, "libfli-usb.c"),
+    os.path.join(fliunx, "libfli-sys.c")
+    ]
+winsrc = [
+    os.path.join(fliwin, "libfli-serial.c"),
+    os.path.join(fliwin, "libfli-debug.c"),
+    os.path.join(fliwin, "libfli-usb.c"),
+    os.path.join(fliwin, "libfli-windows.c"),
+    os.path.join(fliwin, "libfli-windows-parport.c"),
+    os.path.join(flicom, "libfli-raw.c")
+    ]
+linsrc = [
+    os.path.join(flilin, "libfli-usb-sys.c"),
+    os.path.join(flilin, "libfli-parport.c")
+    ]
+bsdsrc = [
+    os.path.join(flibsd, "libfli-usb-sys.c")
+    ]
+osxsrc = [
+    ]
+
+modpth = "pyfli"
+modsrc = [os.path.join(modpth, "pyfli.c")]
+if system == "Linux":
+    src = modsrc + comsrc + unxsrc + linsrc
+    inc = [np.get_include(), modpth, flicom, fliunx, flilin]
+    lib = []
+    mac = []
+elif system == "BSD":
+# not certain that BSD is the correct identifier
+    src = modsrc + comsrc + unxsrc + bsdsrc
+    inc = [np.get_include(), modpth, flicom, fliunx, flibsd]
+    lib = []
+    mac = []
+elif system == "Darwin":
+    src = modsrc + comsrc + unxsrc + osxsrc
+    inc = [np.get_include(), modpth, flicom, fliunx, fliosx]
+    lib = []
+    mac = []
+elif system == "Windows":
+    src = modsrc + comsrc + winsrc
+    inc = [np.get_include(), modpth, flicom, fliwin]
+    lib = ["setupapi", "msvcrt" , "ws2_32"]
+    mac = [("_LIB", None)]
+else:
+    raise RuntimeError("Unrecognized system")
 
 compiler_settings = {
-   'libraries'      : ['fli'],
-   'include_dirs'   : [np.get_include(), 'libfli-1.104'],
-   'library_dirs'   : ['libfli-1.104'],
-   'define_macros'  : []
+   'libraries'      : lib,
+   'include_dirs'   : inc,
+   'library_dirs'   : [],
+   'define_macros'  : mac,
+   'export_symbols' : None
 }
 
-sources = [os.path.join('pyfli', 'pyfli.c')]
 package_data = {'pyfli': ['*.pyx']}
-ext_modules = [Extension('pyfli', sources, **compiler_settings)]
+ext_modules = [Extension('pyfli', src, **compiler_settings)]
 
 
 setup(
@@ -40,6 +107,8 @@ setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: BSD License",
         "Operating System :: POSIX :: Linux",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: Microsoft :: Windows :: Windows 7",
         "Programming Language :: Python",
         "Programming Language :: Python :: 2.6",
         "Programming Language :: Python :: 2.7",
