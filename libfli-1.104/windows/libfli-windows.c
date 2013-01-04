@@ -46,6 +46,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <shlobj.h>
+#include <ctype.h>
 
 #include "../libfli-libfli.h"
 #include "../libfli-debug.h"
@@ -139,11 +140,11 @@ BOOL APIENTRY DllMain( HANDLE hModule,
 
 			if (forcedebug)
 			{
-				SHGetSpecialFolderPath(0, strPath,
-						CSIDL_DESKTOPDIRECTORY, FALSE);
-
-				strcat(strPath, "\\flidbg.txt");
-				FLISetDebugLevel(strPath, forcedebug);
+//				SHGetSpecialFolderPath(0, strPath,
+//						CSIDL_DESKTOPDIRECTORY, FALSE);
+//
+//				strcat(strPath, "\\flidbg.txt");
+//				FLISetDebugLevel(strPath, forcedebug);
 			}
 #endif
 
@@ -203,11 +204,11 @@ LIBFLIAPI FLILibAttach(void)
 
 //#define CREATEDEBUG
 #ifdef CREATEDEBUG
-			SHGetSpecialFolderPath(0, strPath,
-					CSIDL_DESKTOPDIRECTORY, FALSE );
-
-			strcat(strPath, "\\flidbg.txt");
-			FLISetDebugLevel(strPath, FLIDEBUG_ALL);
+//			SHGetSpecialFolderPath(0, strPath,
+//					CSIDL_DESKTOPDIRECTORY, FALSE );
+//
+//			strcat(strPath, "\\flidbg.txt");
+//			FLISetDebugLevel(strPath, FLIDEBUG_ALL);
 #endif
 
 			if (RegOpenKey(HKEY_CURRENT_USER,
@@ -234,11 +235,11 @@ LIBFLIAPI FLILibAttach(void)
 
 			if (forcedebug)
 			{
-				SHGetSpecialFolderPath(0, strPath,
-						CSIDL_DESKTOPDIRECTORY, FALSE);
-
-				strcat(strPath, "\\flidbg.txt");
-				FLISetDebugLevel(strPath, forcedebug);
+//				SHGetSpecialFolderPath(0, strPath,
+//						CSIDL_DESKTOPDIRECTORY, FALSE);
+//
+//				strcat(strPath, "\\flidbg.txt");
+//				FLISetDebugLevel(strPath, forcedebug);
 			}
 
 	OSVersionInfo.dwOSVersionInfoSize=sizeof(OSVERSIONINFO);
