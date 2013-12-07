@@ -1312,6 +1312,8 @@ def setImageArea(dev, ul_x, ul_y, lr_x, lr_y):
     the absolute coordinates of the desired image area, hbin is the
     horizontal bin factor, and vbin is the vertical bin factor.
 
+    Note that the vertical and horizontal bins must be set separately.
+
     Parameters
     ----------
     dev : int
