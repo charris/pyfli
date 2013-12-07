@@ -309,7 +309,7 @@ PIXEL_DEFECT_POINT_DARK = fli.FLI_PIXEL_DEFECT_POINT_DARK
 
 
 # This helper function will be static by default.
-cdef chkerr(long err):
+cdef void chkerr(long err) nogil:
     """
 
     Check FLI function return error code.
@@ -328,13 +328,13 @@ cdef chkerr(long err):
     RuntimeError
 
     """
-    if err == 0:
-        return
-    elif err < 0:
-        raise OSError(-err, os.strerror(-err))
+    if err < 0:
+        with gil:
+            raise OSError(-err, os.strerror(-err))
     elif err > 0:
         # probably shouldn't happen
-        raise RuntimeError("unknown error")
+        with gil:
+            raise RuntimeError("unknown error")
 
 
 def enableVerticalTable(dev, width, offset, flags):
@@ -443,6 +443,10 @@ def grabFrame(dev, depth='16bit', out=None):
     grabRow
 
     """
+    cdef long rowlen
+    cdef long flidev
+    cdef void *rowptr
+
     width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
     shape = (height, width)
     convert = False
@@ -461,8 +465,12 @@ def grabFrame(dev, depth='16bit', out=None):
     else:
         buf = np.empty(shape, dt)
 
+    flidev = dev
+    rowlen = width
     for row in buf:
-        chkerr(fli.FLIGrabRow(dev, np.PyArray_DATA(row), width))
+        rowptr = np.PyArray_DATA(row)
+        with nogil:
+            chkerr(fli.FLIGrabRow(flidev, rowptr, rowlen))
 
     if convert:
         out[...] = buf
