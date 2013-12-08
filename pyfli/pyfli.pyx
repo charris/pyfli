@@ -308,8 +308,33 @@ PIXEL_DEFECT_POINT_BRIGHT = fli.FLI_PIXEL_DEFECT_POINT_BRIGHT
 PIXEL_DEFECT_POINT_DARK = fli.FLI_PIXEL_DEFECT_POINT_DARK
 
 
+# Locking decorator
+def withDeviceLocked(f):
+    """Lock device used in fli function call.
+
+    Parameters
+    ----------
+    f : function
+        Function to work with device locked.
+
+    Returns
+    -------
+    func : function
+        Function wrapper for call
+
+    """
+    def func(dev, *args, **kwargs):
+        lockDevice(dev)
+        try:
+            return f(dev, *args, **kwargs)
+        finally:
+            unlockDevice(dev)
+
+    return func
+
+
 # This helper function will be static by default.
-cdef void chkerr(long err) nogil:
+cdef int chkerr(long err) nogil except -1:
     """
 
     Check FLI function return error code.
@@ -336,7 +361,7 @@ cdef void chkerr(long err) nogil:
         with gil:
             raise RuntimeError("unknown error")
 
-
+@withDeviceLocked
 def enableVerticalTable(dev, width, offset, flags):
     """
 
@@ -358,7 +383,8 @@ def enableVerticalTable(dev, width, offset, flags):
     chkerr(fli.FLIEnableVerticalTable(dev, width, offset, flags))
 
 
-def getVerticalTableEntry(fli.flidev_t dev, index):
+@withDeviceLocked
+def getVerticalTableEntry(dev, index):
     """
 
     Get vertical table entry.
@@ -386,6 +412,7 @@ def getVerticalTableEntry(fli.flidev_t dev, index):
     return height, bin_, mode
 
 
+@withDeviceLocked
 def setVerticalTableEntry(dev, index, height, bin_, mode):
     """
 
@@ -406,6 +433,7 @@ def setVerticalTableEntry(dev, index, height, bin_, mode):
     chkerr(fli.FLISetVerticalTableEntry(dev, index, height, bin_, mode))
 
 
+@withDeviceLocked
 def grabFrame(dev, depth='16bit', out=None):
     """
 
@@ -445,6 +473,7 @@ def grabFrame(dev, depth='16bit', out=None):
     """
     cdef long rowlen
     cdef long flidev
+    cdef long err
     cdef void *rowptr
 
     width, hoffset, hbin, height, voffset, vbin = getReadoutDimensions(dev)
@@ -479,6 +508,7 @@ def grabFrame(dev, depth='16bit', out=None):
         return buf
 
 
+@withDeviceLocked
 def readUserEEPROM(dev, loc, address, nbytes):
     """
 
@@ -519,6 +549,7 @@ def readUserEEPROM(dev, loc, address, nbytes):
     return buf
 
 
+@withDeviceLocked
 def writeUserEEPROM(dev, loc, address, data):
     """
 
@@ -570,6 +601,7 @@ def writeUserEEPROM(dev, loc, address, data):
             np.PyArray_DATA(data)))
 
 
+@withDeviceLocked
 def setTDI(dev, rate, flags):
     """
 
@@ -592,6 +624,7 @@ def setTDI(dev, rate, flags):
     chkerr(fli.FLISetTDI(dev, rate, flags))
 
 
+@withDeviceLocked
 def startVideoMode(dev):
     """
 
@@ -618,6 +651,7 @@ def startVideoMode(dev):
     chkerr(fli.FLIStartVideoMode(dev))
 
 
+@withDeviceLocked
 def stopVideoMode(dev):
     """
 
@@ -639,6 +673,7 @@ def stopVideoMode(dev):
     chkerr(fli.FLIStopVideoMode(dev))
 
 
+@withDeviceLocked
 def grabVideoFrame(dev, out=None):
     """
 
@@ -701,6 +736,7 @@ def grabVideoFrame(dev, out=None):
 
 
 #fixme
+@withDeviceLocked
 def UsbBulkIO(dev, int ep, long length):
     """
 
@@ -955,7 +991,12 @@ def FLIClose(dev):
     FLIOpen
 
     """
-    chkerr(fli.FLIClose(dev))
+    lockDevice(dev)
+    try:
+        chkerr(fli.FLIClose(dev))
+    except:
+        unlockDevice(dev)
+        raise
 
 
 #
@@ -963,6 +1004,7 @@ def FLIClose(dev):
 #
 
 
+@withDeviceLocked
 def getModel(dev):
     """
 
@@ -990,6 +1032,7 @@ def getModel(dev):
     return asstr(buf)
 
 
+@withDeviceLocked
 def getSerialString(dev):
     """
 
@@ -1017,6 +1060,7 @@ def getSerialString(dev):
     return asstr(buf)
 
 
+@withDeviceLocked
 def getHWRevision(dev):
     """
 
@@ -1040,6 +1084,7 @@ def getHWRevision(dev):
     return hwrev
 
 
+@withDeviceLocked
 def getFWRevision(dev):
     """
 
@@ -1112,6 +1157,7 @@ def unlockDevice(dev):
 #
 
 
+@withDeviceLocked
 def getCameraModeString(dev, index):
     """
 
@@ -1145,6 +1191,7 @@ def getCameraModeString(dev, index):
     return asstr(mode)
 
 
+@withDeviceLocked
 def getCameraMode(dev):
     """
 
@@ -1174,6 +1221,7 @@ def getCameraMode(dev):
     return index
 
 
+@withDeviceLocked
 def setCameraMode(dev, index):
     """
 
@@ -1197,6 +1245,7 @@ def setCameraMode(dev, index):
     chkerr(fli.FLISetCameraMode(dev, index))
 
 
+@withDeviceLocked
 def getPixelSize(dev):
     """
 
@@ -1219,6 +1268,7 @@ def getPixelSize(dev):
     return pix_x, pix_y
 
 
+@withDeviceLocked
 def getArrayArea(dev):
     """
 
@@ -1248,6 +1298,7 @@ def getArrayArea(dev):
     return ul_x, ul_y, lr_x, lr_y
 
 
+@withDeviceLocked
 def getVisibleArea(dev):
     """
 
@@ -1277,6 +1328,7 @@ def getVisibleArea(dev):
     return ul_x, ul_y, lr_x, lr_y
 
 
+@withDeviceLocked
 def setExposureTime(dev, exptime):
     """
 
@@ -1297,6 +1349,7 @@ def setExposureTime(dev, exptime):
     chkerr(fli.FLISetExposureTime(dev, exptime))
 
 
+@withDeviceLocked
 def setImageArea(dev, ul_x, ul_y, lr_x, lr_y):
     """
 
@@ -1339,6 +1392,7 @@ def setImageArea(dev, ul_x, ul_y, lr_x, lr_y):
     chkerr(fli.FLISetImageArea(dev, ul_x, ul_y, lr_x, lr_y))
 
 
+@withDeviceLocked
 def setHBin(dev, hbin):
     """
 
@@ -1364,6 +1418,7 @@ def setHBin(dev, hbin):
     chkerr(fli.FLISetHBin(dev, hbin))
 
 
+@withDeviceLocked
 def setVBin(dev, vbin):
     """
 
@@ -1389,6 +1444,7 @@ def setVBin(dev, vbin):
     chkerr(fli.FLISetVBin(dev, vbin))
 
 
+@withDeviceLocked
 def setFrameType(dev, ftype):
     """
 
@@ -1426,6 +1482,7 @@ def setFrameType(dev, ftype):
     chkerr(fli.FLISetFrameType(dev, frametype))
 
 
+@withDeviceLocked
 def cancelExposure(dev):
     """
 
@@ -1443,6 +1500,7 @@ def cancelExposure(dev):
     chkerr(fli.FLICancelExposure(dev))
 
 
+@withDeviceLocked
 def endExposure(dev):
     """
 
@@ -1460,6 +1518,7 @@ def endExposure(dev):
     chkerr(fli.FLICancelExposure(dev))
 
 
+@withDeviceLocked
 def getExposureStatus(dev):
     """
 
@@ -1485,6 +1544,7 @@ def getExposureStatus(dev):
     return timeleft
 
 
+@withDeviceLocked
 def setTemperature(dev, temperature):
     """
 
@@ -1505,6 +1565,7 @@ def setTemperature(dev, temperature):
     chkerr(fli.FLISetTemperature(dev, temperature))
 
 
+@withDeviceLocked
 def getTemperature(dev):
     """
 
@@ -1529,6 +1590,7 @@ def getTemperature(dev):
     return temperature
 
 
+@withDeviceLocked
 def getCoolerPower(dev):
     """
 
@@ -1553,6 +1615,7 @@ def getCoolerPower(dev):
     return power
 
 
+@withDeviceLocked
 def grabRow(dev, depth='16bit', out=None):
     """
 
@@ -1619,6 +1682,7 @@ def grabRow(dev, depth='16bit', out=None):
         return buf
 
 
+@withDeviceLocked
 def exposeFrame(dev):
     """
 
@@ -1638,6 +1702,7 @@ def exposeFrame(dev):
     chkerr(fli.FLIExposeFrame(dev))
 
 
+@withDeviceLocked
 def flushRow(dev, rows, repeat):
     """
 
@@ -1658,6 +1723,7 @@ def flushRow(dev, rows, repeat):
     chkerr(fli.FLIFlushRow(dev, rows, repeat))
 
 
+@withDeviceLocked
 def setNFlushes(dev, nflushes):
     """
 
@@ -1680,6 +1746,7 @@ def setNFlushes(dev, nflushes):
     chkerr(fli.FLISetNFlushes(dev, nflushes))
 
 
+@withDeviceLocked
 def setBitDepth(dev, depth):
     """
 
@@ -1714,6 +1781,7 @@ def setBitDepth(dev, depth):
     chkerr(fli.FLISetBitDepth(dev, bitdepth))
 
 
+@withDeviceLocked
 def readIOPort(dev):
     """
 
@@ -1744,6 +1812,7 @@ def readIOPort(dev):
     return ioportset
 
 
+@withDeviceLocked
 def writeIOPort(dev, ioportset):
     """
 
@@ -1768,6 +1837,7 @@ def writeIOPort(dev, ioportset):
     chkerr(fli.FLIWriteIOPort(dev, ioportset))
 
 
+@withDeviceLocked
 def configureIOPort(dev, ioportset):
     """
 
@@ -1796,6 +1866,7 @@ def configureIOPort(dev, ioportset):
     chkerr(fli.FLIConfigureIOPort(dev, ioportset))
 
 
+@withDeviceLocked
 def controlShutter(dev, shutter=None, control=None):
     """
 
@@ -1857,6 +1928,7 @@ def controlShutter(dev, shutter=None, control=None):
     chkerr(fli.FLIControlShutter(dev, shutter))
 
 
+@withDeviceLocked
 def triggerExposure(dev):
     """
 
@@ -1873,6 +1945,7 @@ def triggerExposure(dev):
     chkerr(fli.FLITriggerExposure(dev))
 
 
+@withDeviceLocked
 def controlBackgroundFlush(dev, control):
     """
 
@@ -1909,6 +1982,7 @@ def controlBackgroundFlush(dev, control):
     chkerr(fli.FLIControlBackgroundFlush(dev, bgflush))
 
 
+@withDeviceLocked
 def setFanSpeed(dev, state):
     """
 
@@ -1937,6 +2011,7 @@ def setFanSpeed(dev, state):
     chkerr(fli.FLISetFanSpeed(dev, speed))
 
 
+@withDeviceLocked
 def getReadoutDimensions(dev):
     """
 
@@ -1983,6 +2058,7 @@ def getReadoutDimensions(dev):
 #
 
 
+@withDeviceLocked
 def stepMotor(dev, steps):
     """
 
@@ -2006,6 +2082,7 @@ def stepMotor(dev, steps):
     chkerr(fli.FLIStepMotor(dev, steps))
 
 
+@withDeviceLocked
 def stepMotorAsync(dev, steps):
     """
 
@@ -2029,6 +2106,7 @@ def stepMotorAsync(dev, steps):
     chkerr(fli.FLIStepMotorAsync(dev, steps))
 
 
+@withDeviceLocked
 def getStepperPosition(dev):
     """
 
@@ -2058,6 +2136,7 @@ def getStepperPosition(dev):
     return position
 
 
+@withDeviceLocked
 def getStepsRemaining(dev):
     """
 
@@ -2086,6 +2165,7 @@ def getStepsRemaining(dev):
     return steps
 
 
+@withDeviceLocked
 def getDeviceStatus(dev):
     """
 
@@ -2158,6 +2238,7 @@ def getDeviceStatus(dev):
     return status
 
 
+@withDeviceLocked
 def homeDevice(dev):
     """
 
@@ -2190,6 +2271,7 @@ def homeDevice(dev):
 #
 
 
+@withDeviceLocked
 def homeFocuser(dev):
     """
 
@@ -2220,6 +2302,7 @@ def homeFocuser(dev):
     chkerr(fli.FLIHomeFocuser(dev))
 
 
+@withDeviceLocked
 def getFocuserExtent(dev):
     """
 
@@ -2246,6 +2329,7 @@ def getFocuserExtent(dev):
     return extent
 
 
+@withDeviceLocked
 def readTemperature(dev, channel):
     """
 
@@ -2284,6 +2368,7 @@ def readTemperature(dev, channel):
 #
 
 
+@withDeviceLocked
 def getFilterName(dev, position):
     """
 
@@ -2310,6 +2395,7 @@ def getFilterName(dev, position):
     return asstr(buf)
 
 
+@withDeviceLocked
 def setActiveWheel(dev, wheel):
     """
 
@@ -2332,6 +2418,7 @@ def setActiveWheel(dev, wheel):
     chkerr(fli.FLISetActiveWheel(dev, wheel))
 
 
+@withDeviceLocked
 def getActiveWheel(dev):
     """
 
@@ -2360,6 +2447,7 @@ def getActiveWheel(dev):
     return wheel
 
 
+@withDeviceLocked
 def setFilterPos(dev, position):
     """
 
@@ -2382,6 +2470,7 @@ def setFilterPos(dev, position):
     chkerr(fli.FLISetFilterPos(dev, position))
 
 
+@withDeviceLocked
 def getFilterPos(dev):
     """
 
@@ -2410,6 +2499,7 @@ def getFilterPos(dev):
     return position
 
 
+@withDeviceLocked
 def getFilterCount(dev):
     """
 
