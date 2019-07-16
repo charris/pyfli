@@ -72,7 +72,7 @@ elif system == "Darwin":
 elif system == "Windows":
     src = modsrc + comsrc + winsrc
     inc = [np.get_include(), modpth, flicom, fliwin]
-    lib = ["setupapi", "msvcrt" , "ws2_32"]
+    lib = ["setupapi", "msvcrt" , "ws2_32", "Advapi32"]
     mac = [("_LIB", None)]
 else:
     raise RuntimeError("Unrecognized system")
